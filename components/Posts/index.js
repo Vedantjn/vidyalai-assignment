@@ -34,42 +34,51 @@ const LoadMoreButton = styled.button(() => ({
 
 export default function Posts() {
   const [posts, setPosts] = useState([]);
+  const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const { isSmallerDevice } = useWindowWidth();
 
   useEffect(() => {
-    const fetchPost = async () => {
-      const { data: posts } = await axios.get('/api/v1/posts', {
-        params: { start: 0, limit: isSmallerDevice ? 5 : 10 },
-      });
-      setPosts(posts);
+    const fetchPostsAndUsers = async () => {
+      const [postResponse, userResponse] = await Promise.all([
+        axios.get('/api/v1/posts', { params: { start: 0, limit: isSmallerDevice ? 5 : 10 } }),
+        axios.get('/api/v1/users')
+      ]);
+
+      setPosts(postResponse.data);
+      setUsers(userResponse.data);
     };
 
-    fetchPost();
+    fetchPostsAndUsers();
   }, [isSmallerDevice]);
 
-  const handleClick = () => {
+  const handleClick = async () => {
     setIsLoading(true);
-
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 3000);
+    const { data: newPosts } = await axios.get('/api/v1/posts', {
+      params: { start: posts.length, limit: isSmallerDevice ? 5 : 10 }
+    });
+    setPosts(prevPosts => [...prevPosts, ...newPosts]);
+    setIsLoading(false);
   };
+
+  const getUserById = (userId) => users.find(user => user.id === userId);
 
   return (
     <Container>
       <PostListContainer>
         {posts.map(post => (
-          <Post post={post} />
+          <Post key={post.id} post={post} user={getUserById(post.userId)} />
         ))}
       </PostListContainer>
 
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <LoadMoreButton onClick={handleClick} disabled={isLoading}>
-          {!isLoading ? 'Load More' : 'Loading...'}
-        </LoadMoreButton>
-      </div>
+      {posts.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <LoadMoreButton onClick={handleClick} disabled={isLoading}>
+            {!isLoading ? 'Load More' : 'Loading...'}
+          </LoadMoreButton>
+        </div>
+      )}
     </Container>
   );
 }
